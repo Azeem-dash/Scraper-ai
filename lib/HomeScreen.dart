@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:markdown/markdown.dart' as md;
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,8 +16,39 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _queryController = TextEditingController();
   String _response = '';
 
+  var markdownList = [];
   bool _isChatWindowOpen = false;
   bool _isGenerating = false;
+  bool _isLoading = true;
+
+
+  final PageController _pageController = PageController(initialPage: 0);
+
+  // Move to the next page
+  void nextPage() {
+    if (_pageController.page!.toInt() < markdownList.length - 1) {
+      _pageController.nextPage(
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  // Move to the previous page
+  void previousPage() {
+    if (_pageController.page!.toInt() > 0) {
+      _pageController.previousPage(
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    _getArticles();
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         backgroundColor: Colors.blue.shade700,
         title: Text(
-          'Chat Screen',
+          'Articles Screen',
           style: TextStyle(
             fontSize: 22,
             color: Colors.white,
@@ -45,44 +79,47 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome to Chat!',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade800,
+          _isLoading ? Center(child: CircularProgressIndicator()) : Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 60.0),
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: markdownList.length,
+              itemBuilder: (context, index) {
+                var htmlContent = md.markdownToHtml('# Article ${markdownList[index]}');
+                return SingleChildScrollView(
+                    child: HtmlWidget(htmlContent)
+                );
+              },
+            ),
+          ),
+          // Navigation buttons in the middle of the screen
+          Positioned(
+            child: Align(
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Previous button
+                  ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        shape: CircleBorder(),
+                        backgroundColor: Colors.blue.shade700,
+                      ),
+                      onPressed: previousPage,
+                      child: Icon(Icons.arrow_back, size: 30, color: Colors.white)
                   ),
-                ),
-                SizedBox(height: 20),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: 5, // Placeholder for recent chats
-                    itemBuilder: (context, index) {
-                      return Card(
-                        elevation: 4,
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ListTile(
-                          onTap: (){
-                            print('hehehe');
-                          },
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.blue.shade100,
-                            child: Icon(Icons.person, color: Colors.blue.shade700),
-                          ),
-                          title: Text('Chat ${index + 1}'),
-                          subtitle: Text('This is a placeholder for chat message preview'),
-                          trailing: Icon(Icons.chevron_right, color: Colors.blue.shade700),
-                        ),
-                      );
-                    },
+
+                  // Next button
+                  ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                          shape: CircleBorder(),
+                          backgroundColor: Colors.blue.shade700
+                      ),
+                      onPressed: nextPage,
+                      child: Icon(Icons.arrow_forward, size: 30, color: Colors.white)
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           _isChatWindowOpen ? Padding(
@@ -129,6 +166,24 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            Expanded(
+              child: Container(
+                width: double.maxFinite,
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    _isGenerating ? 'Generating...' : _response.isEmpty ? 'Write Query to get Response...' : _response,
+                    style: TextStyle(fontSize: 16, color: Colors.blue.shade700),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 10),
+
             // Query input section
             TextField(
               controller: _queryController,
@@ -138,24 +193,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 border: OutlineInputBorder(),
               ),
               maxLines: 1,
-            ),
-            SizedBox(height: 10),
-
-            Expanded(
-              child: SingleChildScrollView(
-                child: Container(
-                  width: double.maxFinite,
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _response.isEmpty ? 'Response...' : _response,
-                    style: TextStyle(fontSize: 16, color: Colors.blue.shade700),
-                  ),
-                ),
-              ),
             ),
             SizedBox(height: 10),
 
@@ -185,29 +222,61 @@ class _HomeScreenState extends State<HomeScreen> {
     if (query.isEmpty) return;
 
     try {
-      _isGenerating = true;
+      setState(() {
+        _isGenerating = true;
+        print('Generating...');
+      });
+
       final response = await dio.post(
         'http://127.0.0.1:8000/chat', // FastAPI server URL
-        data: {'query': query},  // Sending query in the body
+        data: {
+          'query': 'Query: $query\n\n\n'
+              'Give answer from this Article ${markdownList[_pageController.page!.toInt()]}\n\n'
+              'Note: The data is written in md format you have to give response in simple text only'
+        },  // Sending query in the body
       );
 
       // Check if the response is successful
       if (response.statusCode == 200) {
-        setState(() {
-          _response = response.data['response'];  // Extract the response data
-        });
+        _response = response.data['response'];
       } else {
-        setState(() {
-          _response = 'Error: ${response.statusCode}';  // If something goes wrong
-        });
+        _response = 'Error: ${response.statusCode}';
+      }
+      print(_response);
+    } catch (e) {
+      print('Failed to get response: $e');
+      _response = 'Failed to get response: $e';
+    } finally {
+      _isGenerating = false;
+      setState(() {});
+    }
+  }
+
+  Future<void> _getArticles() async {
+
+    try {
+      final response = await dio.get(
+        'http://127.0.0.1:8000/scraping/fetch', // FastAPI server URL
+      );
+
+      // Check if the response is successful
+      if (response.statusCode == 200) {
+        if (response.data['success'] == true) {
+          markdownList = response.data['scraped_data'];
+        }
+        else {
+          markdownList = [response.data['message']];
+        }
+      } else {
+        markdownList = ['Error: ${response.statusCode}'];
       }
     } catch (e) {
       print('Failed to get response: $e');
-      setState(() {
-        _response = 'Failed to get response: $e';
-      });
-    } finally {
-      _isGenerating = false;
+      _response = 'Failed to get response: $e';
+    } 
+    finally {
+      _isLoading = false;
+      setState(() {});
     }
   }
 }

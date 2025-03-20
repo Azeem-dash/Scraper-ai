@@ -37,6 +37,7 @@ dependencies:
   dio: ^5.8.0+1
   flutter_widget_from_html: ^0.16.0
   markdown: ^7.3.0
+  mistralai_client_dart: ^1.1.0
 
 dev_dependencies:
   flutter_test:

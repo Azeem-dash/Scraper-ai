@@ -38,6 +38,8 @@ dependencies:
   flutter_widget_from_html: ^0.16.0
   markdown: ^7.3.0
   mistralai_client_dart: ^1.1.0
+  flutter_dotenv: ^5.2.1
+  get: ^4.7.2
 
 dev_dependencies:
   flutter_test:

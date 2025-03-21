@@ -2,20 +2,22 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:mistralai_client_dart/mistralai_client_dart.dart';
 
+// final client = MistralAIClient(apiKey: dotenv.env['API_KEY'] ?? 'default_api_key');
 final client = MistralAIClient(apiKey: 'aMMDwxogZkfE5IbI4rRiTNRHrWnnIpDQ');
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class ArticleScreen extends StatefulWidget {
+  const ArticleScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<ArticleScreen> createState() => _ArticleScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _ArticleScreenState extends State<ArticleScreen> {
   final dio = Dio();
   final TextEditingController _queryController = TextEditingController();
   String _response = '';
@@ -96,11 +98,15 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 60.0, vertical: 8),
             child: PageView.builder(
               controller: _pageController,
+              physics: NeverScrollableScrollPhysics(),
               itemCount: markdownList.length,
               itemBuilder: (context, index) {
                 var htmlContent = md.markdownToHtml('# Article ${markdownList[index]}');
                 return SingleChildScrollView(
-                    child: HtmlWidget(htmlContent)
+                    child: SelectableRegion(
+                        selectionControls: materialTextSelectionControls,
+                        child: HtmlWidget(htmlContent)
+                    )
                 );
               },
             ),
